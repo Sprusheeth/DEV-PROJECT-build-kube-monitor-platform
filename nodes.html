@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kube-Monitor — Nodes</title>
+<link rel="stylesheet" href="style.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+.nodes-wrap { padding: 32px 40px; max-width: 1400px; margin: 0 auto; }
+
+/* Page header */
+.page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 32px; padding-bottom: 24px;
+  border-bottom: 1px solid var(--br);
+}
+.ph-left { }
+.ph-kicker { font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:3px; color:var(--cyan); text-transform:uppercase; margin-bottom:6px; }
+.ph-title  { font-size:28px; font-weight:800; letter-spacing:-1px; }
+.ph-sub    { color:var(--text2); font-size:14px; margin-top:4px; }
+.ph-right  { display:flex; gap:10px; }
+
+/* Node selector tabs */
+.node-tabs { display:flex; gap:8px; margin-bottom:28px; flex-wrap:wrap; }
+.node-tab {
+  display:flex; align-items:center; gap:8px;
+  padding:10px 18px; border-radius:10px;
+  background:var(--bg2); border:1px solid var(--br);
+  cursor:pointer; transition:all .2s;
+  text-decoration:none; color:var(--text2);
+  font-size:13px; font-weight:600;
+}
+.node-tab:hover { border-color:var(--br2); background:var(--bg3); color:var(--text); }
+.node-tab.active { border-color:rgba(56,189,248,.4); background:rgba(56,189,248,.07); color:var(--cyan); }
+.node-tab-dot { width:8px; height:8px; border-radius:50%; animation:pulse-dot 2s ease infinite; }
+
+/* Detail layout */
+.detail-grid { display:grid; grid-template-columns:320px 1fr; gap:20px; margin-bottom:24px; }
+
+/* Spec card */
+.spec-card { background:var(--bg2); border:1px solid var(--br); border-radius:16px; padding:24px; }
+.spec-header { display:flex; align-items:center; gap:12px; margin-bottom:24px; padding-bottom:18px; border-bottom:1px solid var(--br); }
+.spec-node-icon { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; }
+.spec-name { font-size:18px; font-weight:800; }
+.spec-sub  { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text3); margin-top:2px; }
+
+.spec-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--br); }
+.spec-row:last-child { border-bottom:none; }
+.spec-key { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text3); letter-spacing:1px; text-transform:uppercase; }
+.spec-val { font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:600; color:var(--text); text-align:right; }
+
+/* Charts panel */
+.charts-panel { background:var(--bg2); border:1px solid var(--br); border-radius:16px; padding:24px; }
+.charts-grid  { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.mini-chart   { }
+.mini-chart-title { font-size:13px; font-weight:600; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+.mini-chart-sub   { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text3); margin-bottom:12px; }
+.mini-chart-area  { height:140px; position:relative; }
+
+/* Gauges row */
+.gauges-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.gauge-card {
+  background:var(--bg2); border:1px solid var(--br); border-radius:14px;
+  padding:20px; text-align:center;
+  transition:all .25s var(--ease);
+}
+.gauge-card:hover { border-color:var(--br2); transform:translateY(-2px); }
+.gauge-val   { font-size:28px; font-weight:800; }
+.gauge-label { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:2px; color:var(--text3); text-transform:uppercase; margin-top:4px; }
+.gauge-bar   { margin-top:12px; }
+
+/* All nodes overview table */
+.table-section { background:var(--bg2); border:1px solid var(--br); border-radius:16px; padding:24px; }
+.full-tbl { width:100%; border-collapse:collapse; }
+.full-tbl th { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--text3); padding:0 12px 12px; text-align:left; border-bottom:1px solid var(--br); white-space:nowrap; }
+.full-tbl td { padding:13px 12px; font-family:'IBM Plex Mono',monospace; font-size:11px; border-bottom:1px solid rgba(56,189,248,.04); vertical-align:middle; }
+.full-tbl tr:last-child td { border-bottom:none; }
+.full-tbl tr:hover td { background:rgba(56,189,248,.025); }
+.full-tbl .name-cell { font-size:13px; font-weight:700; font-family:'Outfit',sans-serif; color:var(--text); }
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div id="page-loader"><div class="loader-ring"></div><div class="loader-text">Loading Node Data</div></div>
+<div id="navbar" class="navbar"></div>
+
+<div class="page-wrap">
+<div class="nodes-wrap">
+
+  <!-- Page Header -->
+  <div class="page-header anim-up">
+    <div class="ph-left">
+      <div class="ph-kicker">Cluster Infrastructure</div>
+      <div class="ph-title">Node Management</div>
+      <div class="ph-sub">Detailed resource inspection for all cluster nodes</div>
+    </div>
+    <div class="ph-right">
+      <span class="badge badge-emerald" style="padding:6px 14px;font-size:10px">4 NODES ONLINE</span>
+      <span class="badge badge-cyan" style="padding:6px 14px;font-size:10px">HETEROGENEOUS</span>
+    </div>
+  </div>
+
+  <!-- Node Selector -->
+  <div class="node-tabs anim-up-1" id="node-tabs"></div>
+
+  <!-- Gauges -->
+  <div class="gauges-row" id="gauges-row"></div>
+
+  <!-- Detail + Charts -->
+  <div class="detail-grid anim-up-2">
+    <div class="spec-card" id="spec-card"></div>
+    <div class="charts-panel">
+      <div class="panel-header" style="margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--br);display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:15px;font-weight:700">Resource Trends</span>
+        <span class="badge badge-cyan" style="font-size:9px" id="trend-node-label">master-node</span>
+      </div>
+      <div class="charts-grid">
+        <div class="mini-chart">
+          <div class="mini-chart-title"><span style="width:8px;height:8px;border-radius:50%;background:var(--cyan);display:inline-block"></span>CPU Usage</div>
+          <div class="mini-chart-sub">Cores over time</div>
+          <div class="mini-chart-area"><canvas id="c-cpu"></canvas></div>
+        </div>
+        <div class="mini-chart">
+          <div class="mini-chart-title"><span style="width:8px;height:8px;border-radius:50%;background:var(--teal);display:inline-block"></span>Memory Usage</div>
+          <div class="mini-chart-sub">GB over time</div>
+          <div class="mini-chart-area"><canvas id="c-mem"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- All nodes table -->
+  <div class="table-section anim-up-3" style="margin-top:20px">
+    <div style="margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--br);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:700">All Nodes — 15 Metrics Overview</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3)">Updated every 5s</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="full-tbl">
+        <thead><tr>
+          <th>NODE</th><th>TYPE</th><th>OS</th>
+          <th>ALLOC CPU</th><th>USE CPU</th><th>REQ CPU</th><th>LIM CPU</th>
+          <th>ALLOC MEM</th><th>USE MEM</th><th>REQ MEM</th><th>LIM MEM</th>
+          <th>CPU %</th><th>MEM %</th><th>PODS</th><th>STATUS</th>
+        </tr></thead>
+        <tbody id="full-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<footer id="footer"></footer>
+<script src="app.js"></script>
+<script>
+if (!Auth.requireAuth()) {}
+Nav.init('nodes');
+renderFooter();
+MetricsEngine.init();
+
+let selNode = 'master-node';
+let cpuC = null, memC = null;
+
+const NODE_COLORS = {
+  master: { color: 'var(--indigo)', hex: '#818cf8' },
+  laptop: { color: 'var(--cyan)',   hex: '#38bdf8' },
+  rpi:    { color: 'var(--teal)',   hex: '#2dd4bf' },
+};
+
+function init() {
+  buildNodeTabs();
+  cpuC = makeLineChart('c-cpu', '#38bdf8', 'CPU');
+  memC = makeLineChart('c-mem', '#2dd4bf', 'Memory (GB)');
+  // patch memC to show GB
+  memC._isMemChart = true;
+  refresh();
+  setTimeout(() => document.getElementById('page-loader').classList.add('hidden'), 700);
+  setInterval(refresh, 5000);
+}
+
+function buildNodeTabs() {
+  const tabs = document.getElementById('node-tabs');
+  tabs.innerHTML = '';
+  const cfg = [
+    { name:'master-node',  type:'master', label:'Master Node'  },
+    { name:'worker-pc-1',  type:'laptop', label:'Worker PC'    },
+    { name:'worker-rpi-1', type:'rpi',    label:'RPi Node 1'   },
+    { name:'worker-rpi-2', type:'rpi',    label:'RPi Node 2'   },
+  ];
+  cfg.forEach(n => {
+    const { color } = NODE_COLORS[n.type];
+    const btn = document.createElement('div');
+    btn.className = 'node-tab' + (n.name === selNode ? ' active' : '');
+    btn.innerHTML = `<div class="node-tab-dot" style="background:${color}"></div>${n.label}<span class="badge ${Fmt.nodeTypeBadge(n.type)}" style="font-size:9px">${Fmt.nodeTypeLabel(n.type)}</span>`;
+    btn.onclick = () => {
+      selNode = n.name;
+      document.querySelectorAll('.node-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('trend-node-label').textContent = n.name;
+      renderDetail(MetricsEngine.get());
+      updateCharts();
+    };
+    tabs.appendChild(btn);
+  });
+}
+
+function refresh() {
+  const data = MetricsEngine.tick();
+  renderGauges(data);
+  renderDetail(data);
+  renderFullTable(data);
+  updateCharts();
+}
+
+function renderGauges(data) {
+  const m = data.find(d => d.name === selNode) || data[0];
+  if (!m) return;
+  const cp = Fmt.pct(m.useCPU, m.allocCPU);
+  const mp = Fmt.pct(m.useMem, m.allocMem);
+  const { color } = NODE_COLORS[m.type];
+  const gauges = [
+    { val: Fmt.cpu(m.useCPU), lbl: 'CPU Usage (cores)', pct: cp, color: Fmt.cpuColor(cp) },
+    { val: Fmt.bytes(m.useMem), lbl: 'Memory Usage', pct: mp, color: Fmt.memColor(mp) },
+    { val: m.pods, lbl: 'Running Pods', pct: (m.pods/10*100).toFixed(0), color: 'var(--amber)' },
+    { val: m.uptime, lbl: 'Node Uptime', pct: parseFloat(m.uptime).toFixed(0), color: 'var(--emerald)' },
+  ];
+  const el = document.getElementById('gauges-row');
+  el.innerHTML = gauges.map((g,i) => `
+    <div class="gauge-card">
+      <div class="gauge-val" style="color:${g.color}">${g.val}</div>
+      <div class="gauge-label">${g.lbl}</div>
+      <div class="gauge-bar">
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${g.pct}%;background:${g.color}"></div>
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);text-align:right;margin-top:4px">${g.pct}%</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderDetail(data) {
+  const m = data.find(d => d.name === selNode) || data[0];
+  if (!m) return;
+  const { color } = NODE_COLORS[m.type];
+  const iconContent = m.type === 'rpi'
+    ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="${NODE_COLORS[m.type].hex}"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M2 12h4M18 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>`
+    : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${NODE_COLORS[m.type].hex}" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
+
+  const rows = [
+    ['Node Name',  m.name],
+    ['Node Type',  Fmt.nodeTypeLabel(m.type)],
+    ['OS',         m.os],
+    ['Alloc CPU',  `${m.allocCPU} cores`],
+    ['Alloc Mem',  Fmt.bytes(m.allocMem)],
+    ['CPU Limit',  `${Fmt.cpu(m.limCPU)} cores`],
+    ['Mem Limit',  Fmt.bytes(m.limMem)],
+    ['CPU Request',`${Fmt.cpu(m.reqCPU)} cores`],
+    ['Mem Request',Fmt.bytes(m.reqMem)],
+    ['Pods',       m.pods],
+    ['Status',     m.status],
+    ['Uptime',     m.uptime],
+  ];
+
+  document.getElementById('spec-card').innerHTML = `
+    <div class="spec-header">
+      <div class="spec-node-icon" style="background:${color.replace('var(--','rgba(').replace(')',', .12)')};border:1px solid ${color.replace('var(--','rgba(').replace(')',', .25)')}">
+        ${iconContent}
+      </div>
+      <div>
+        <div class="spec-name">${m.name}</div>
+        <div class="spec-sub">${m.type.toUpperCase()} · ${m.os}</div>
+      </div>
+    </div>
+    ${rows.map(([k,v]) => `
+      <div class="spec-row">
+        <span class="spec-key">${k}</span>
+        <span class="spec-val">${v}</span>
+      </div>`).join('')}`;
+}
+
+function renderFullTable(data) {
+  const tb = document.getElementById('full-tbody');
+  tb.innerHTML = '';
+  data.forEach(m => {
+    const cp = parseFloat(Fmt.pct(m.useCPU, m.allocCPU));
+    const mp = parseFloat(Fmt.pct(m.useMem, m.allocMem));
+    const cc = Fmt.cpuColor(cp), mc = Fmt.memColor(mp);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="name-cell">${m.name}</td>
+      <td><span class="badge ${Fmt.nodeTypeBadge(m.type)}">${Fmt.nodeTypeLabel(m.type)}</span></td>
+      <td style="color:var(--text3)">${m.os}</td>
+      <td style="color:var(--text2)">${m.allocCPU}</td>
+      <td style="color:${cc};font-weight:600">${Fmt.cpu(m.useCPU)}</td>
+      <td style="color:var(--text2)">${Fmt.cpu(m.reqCPU)}</td>
+      <td style="color:var(--amber)">${Fmt.cpu(m.limCPU)}</td>
+      <td style="color:var(--text2)">${Fmt.bytes(m.allocMem)}</td>
+      <td style="color:${mc};font-weight:600">${Fmt.bytes(m.useMem)}</td>
+      <td style="color:var(--text2)">${Fmt.bytes(m.reqMem)}</td>
+      <td style="color:var(--amber)">${Fmt.bytes(m.limMem)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;min-width:50px">
+            <div style="height:100%;width:${cp}%;background:${cc};border-radius:2px"></div>
+          </div>
+          <span style="color:${cc};font-size:10px">${cp}%</span>
+        </div>
+      </td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;min-width:50px">
+            <div style="height:100%;width:${mp}%;background:${mc};border-radius:2px"></div>
+          </div>
+          <span style="color:${mc};font-size:10px">${mp}%</span>
+        </div>
+      </td>
+      <td style="color:var(--amber);font-weight:700">${m.pods}</td>
+      <td><span class="badge badge-emerald">${m.status}</span></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function updateCharts() {
+  const h = MetricsEngine.getHistory(selNode);
+  if (!cpuC || !h.length) return;
+  cpuC.data.labels = h.map(x => x.t);
+  cpuC.data.datasets[0].data = h.map(x => parseFloat(x.cpu.toFixed(3)));
+  cpuC.update('active');
+  memC.data.labels = h.map(x => x.t);
+  memC.data.datasets[0].data = h.map(x => parseFloat((x.mem / 1024**3).toFixed(2)));
+  memC.update('active');
+}
+
+init();
+</script>
+</body>
+</html>

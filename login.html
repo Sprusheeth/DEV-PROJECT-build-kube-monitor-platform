@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kube-Monitor — Sign In</title>
+<link rel="stylesheet" href="style.css"/>
+<style>
+body { overflow: hidden; }
+.login-wrap {
+  min-height: calc(100vh - 64px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+/* ── LEFT PANEL ── */
+.login-left {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 60px;
+  position: relative; z-index: 10;
+  border-right: 1px solid var(--br);
+  overflow-y: auto;
+}
+.login-header { width: 100%; max-width: 380px; margin-bottom: 36px; }
+.login-header-tag {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; letter-spacing: 3px; color: var(--cyan);
+  text-transform: uppercase; margin-bottom: 12px; display: block;
+}
+.login-header h1 { font-size: 32px; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; }
+.login-header p { color: var(--text2); font-size: 14px; }
+
+/* Tabs */
+.auth-tabs {
+  width: 100%; max-width: 380px;
+  display: flex; gap: 4px;
+  background: var(--bg3); border: 1px solid var(--br);
+  border-radius: 12px; padding: 4px;
+  margin-bottom: 28px;
+}
+.auth-tab {
+  flex: 1; padding: 10px;
+  background: transparent; border: none;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px; font-weight: 600;
+  color: var(--text3); cursor: pointer;
+  border-radius: 9px; transition: all .2s;
+}
+.auth-tab.on {
+  background: var(--bg4);
+  color: var(--cyan);
+  box-shadow: 0 0 16px rgba(56,189,248,.12);
+}
+
+.auth-form { width: 100%; max-width: 380px; }
+.auth-panel { display: none; }
+.auth-panel.on { display: block; animation: fadeUp .3s var(--ease) both; }
+
+/* Fields */
+.field { margin-bottom: 18px; }
+.field-label {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--text3);
+  margin-bottom: 8px;
+}
+.field-wrap { position: relative; }
+.field-ico {
+  position: absolute; left: 14px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text4); transition: color .2s;
+  pointer-events: none;
+}
+.field-input {
+  width: 100%;
+  padding: 13px 14px 13px 44px;
+  background: var(--bg3);
+  border: 1px solid var(--br);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px; outline: none;
+  transition: all .2s;
+}
+.field-input::placeholder { color: var(--text4); }
+.field-input:focus { border-color: rgba(56,189,248,.4); background: rgba(56,189,248,.04); box-shadow: 0 0 0 3px rgba(56,189,248,.08); }
+.field-wrap:focus-within .field-ico { color: var(--cyan); }
+
+/* Submit */
+.submit-btn {
+  width: 100%; padding: 14px;
+  background: linear-gradient(135deg, var(--cyan2), var(--cyan));
+  border: none; border-radius: 10px;
+  color: #04080f; font-family: 'Outfit', sans-serif;
+  font-size: 15px; font-weight: 800;
+  letter-spacing: 0.5px; cursor: pointer;
+  transition: all .2s;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 24px rgba(56,189,248,.3);
+  margin-top: 6px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.submit-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 32px rgba(56,189,248,.4); }
+.submit-btn:active { transform: translateY(0); }
+.submit-btn.busy::after {
+  content: '';
+  width: 16px; height: 16px;
+  border: 2px solid rgba(0,0,0,.3);
+  border-top-color: #04080f;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+
+/* Alert */
+.auth-alert {
+  padding: 11px 14px; border-radius: 9px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  margin-bottom: 18px; display: none;
+  align-items: flex-start; gap: 9px; line-height: 1.5;
+}
+.auth-alert.show-err { display: flex; background: rgba(251,113,133,.08); border: 1px solid rgba(251,113,133,.25); color: var(--rose); }
+.auth-alert.show-ok  { display: flex; background: rgba(52,211,153,.08);  border: 1px solid rgba(52,211,153,.25);  color: var(--emerald); }
+
+/* Divider */
+.or-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 22px 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; color: var(--text4); letter-spacing: 2px;
+}
+.or-divider::before, .or-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--br);
+}
+
+/* ── RIGHT PANEL ── */
+.login-right {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 60px; position: relative;
+  background: linear-gradient(160deg, rgba(56,189,248,.04), rgba(45,212,191,.02));
+  overflow: hidden;
+}
+.login-right .orb {
+  position: absolute; border-radius: 50%;
+  filter: blur(80px); pointer-events: none;
+}
+.preview-card {
+  width: 100%; max-width: 420px;
+  background: var(--bg2); border: 1px solid var(--br2);
+  border-radius: 20px; overflow: hidden;
+  box-shadow: var(--shadow2);
+  animation: fadeUp .8s var(--ease) .2s both;
+}
+.preview-bar {
+  padding: 14px 18px;
+  background: var(--bg3); border-bottom: 1px solid var(--br);
+  display: flex; align-items: center; gap: 10px;
+}
+.preview-dots { display: flex; gap: 5px; }
+.preview-dot { width: 8px; height: 8px; border-radius: 50%; }
+.preview-title { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text3); letter-spacing: 1px; margin-left: 8px; }
+.preview-body { padding: 20px; }
+.prev-stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
+.prev-stat {
+  padding: 12px; border-radius: 10px;
+  background: var(--bg3); border: 1px solid var(--br);
+  text-align: center;
+}
+.prev-stat-v { font-size: 20px; font-weight: 800; }
+.prev-stat-l { font-family: 'IBM Plex Mono', monospace; font-size: 8px; color: var(--text3); letter-spacing: 1px; margin-top: 2px; }
+.prev-node {
+  padding: 12px; border-radius: 10px;
+  background: var(--bg3); border: 1px solid var(--br);
+  margin-bottom: 8px; display: flex; align-items: center; gap: 12px;
+}
+.prev-node:last-child { margin-bottom: 0; }
+.prev-ndot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; animation: pulse-dot 2s ease infinite; }
+.prev-nname { font-size: 13px; font-weight: 600; flex: 1; }
+.prev-ntype { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--text3); }
+.prev-nbar-wrap { width: 80px; }
+.prev-nbar { height: 3px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
+.prev-nbar-fill { height: 100%; border-radius: 2px; animation: barGrow 2s var(--ease) both; }
+@keyframes barGrow { from { width: 0 !important; } }
+.preview-caption {
+  margin-top: 28px; text-align: center;
+  font-size: 13px; color: var(--text3);
+  line-height: 1.6;
+}
+.preview-caption strong { color: var(--text2); font-weight: 600; }
+
+@media (max-width: 900px) {
+  .login-wrap { grid-template-columns: 1fr; }
+  .login-right { display: none; }
+  body { overflow: auto; }
+}
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div id="navbar" class="navbar"></div>
+
+<div class="page-wrap">
+  <div class="login-wrap">
+
+    <!-- LEFT: Form -->
+    <div class="login-left">
+      <div class="login-header anim-up">
+        <span class="login-header-tag">Kubernetes Monitoring</span>
+        <h1>Welcome back</h1>
+        <p>Sign in to access your cluster dashboard</p>
+      </div>
+
+      <div class="auth-tabs anim-up-1">
+        <button class="auth-tab on" onclick="switchTab('login',this)">Sign In</button>
+        <button class="auth-tab"    onclick="switchTab('register',this)">Register</button>
+      </div>
+
+      <div class="auth-form">
+        <div id="auth-alert" class="auth-alert"></div>
+
+        <!-- LOGIN -->
+        <div id="login-panel" class="auth-panel on">
+          <div class="field">
+            <label class="field-label">Email Address</label>
+            <div class="field-wrap">
+              <input id="l-email" type="email" class="field-input" placeholder="operator@cluster.io" autocomplete="email"/>
+              <svg class="field-ico" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Password</label>
+            <div class="field-wrap">
+              <input id="l-pass" type="password" class="field-input" placeholder="••••••••" autocomplete="current-password"/>
+              <svg class="field-ico" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"/></svg>
+            </div>
+          </div>
+          <button class="submit-btn" id="l-btn" onclick="doLogin()">Sign In to Dashboard</button>
+
+          <div class="or-divider">OR</div>
+          <div style="text-align:center;font-size:13px;color:var(--text3)">
+            Don't have an account? <button onclick="switchTab('register', document.querySelectorAll('.auth-tab')[1])" style="background:none;border:none;color:var(--cyan);cursor:pointer;font-family:Outfit,sans-serif;font-size:13px;font-weight:600">Register here</button>
+          </div>
+        </div>
+
+        <!-- REGISTER -->
+        <div id="register-panel" class="auth-panel">
+          <div class="field">
+            <label class="field-label">Full Name</label>
+            <div class="field-wrap">
+              <input id="r-name" type="text" class="field-input" placeholder="Kubernetes Operator"/>
+              <svg class="field-ico" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Email Address</label>
+            <div class="field-wrap">
+              <input id="r-email" type="email" class="field-input" placeholder="operator@cluster.io"/>
+              <svg class="field-ico" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Password</label>
+            <div class="field-wrap">
+              <input id="r-pass" type="password" class="field-input" placeholder="Min 6 characters"/>
+              <svg class="field-ico" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"/></svg>
+            </div>
+          </div>
+          <button class="submit-btn" id="r-btn" onclick="doRegister()">Create Account</button>
+
+          <div class="or-divider">OR</div>
+          <div style="text-align:center;font-size:13px;color:var(--text3)">
+            Already have an account? <button onclick="switchTab('login', document.querySelectorAll('.auth-tab')[0])" style="background:none;border:none;color:var(--cyan);cursor:pointer;font-family:Outfit,sans-serif;font-size:13px;font-weight:600">Sign in</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Preview -->
+    <div class="login-right">
+      <div class="orb" style="width:400px;height:400px;background:radial-gradient(circle,rgba(56,189,248,.1),transparent 70%);top:-100px;right:-100px"></div>
+      <div class="orb" style="width:300px;height:300px;background:radial-gradient(circle,rgba(45,212,191,.08),transparent 70%);bottom:-80px;left:-80px;animation-delay:-4s"></div>
+
+      <div class="preview-card">
+        <div class="preview-bar">
+          <div class="preview-dots">
+            <div class="preview-dot" style="background:#fb7185"></div>
+            <div class="preview-dot" style="background:#fbbf24"></div>
+            <div class="preview-dot" style="background:#34d399"></div>
+          </div>
+          <span class="preview-title">KUBE-MONITOR · DASHBOARD</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:5px">
+            <div style="width:5px;height:5px;border-radius:50%;background:#34d399;animation:pulse-dot 1.5s ease infinite"></div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#34d399">LIVE</span>
+          </div>
+        </div>
+        <div class="preview-body">
+          <div class="prev-stat-row">
+            <div class="prev-stat">
+              <div class="prev-stat-v" style="color:var(--cyan)">16</div>
+              <div class="prev-stat-l">CPU CORES</div>
+            </div>
+            <div class="prev-stat">
+              <div class="prev-stat-v" style="color:var(--teal)">48 GB</div>
+              <div class="prev-stat-l">MEMORY</div>
+            </div>
+            <div class="prev-stat">
+              <div class="prev-stat-v" style="color:var(--amber)">24</div>
+              <div class="prev-stat-l">PODS</div>
+            </div>
+          </div>
+          <div class="prev-node">
+            <div class="prev-ndot" style="background:var(--indigo);animation-delay:0s"></div>
+            <div><div class="prev-nname">master-node</div><div class="prev-ntype">MASTER · Ubuntu 20.04</div></div>
+            <div class="prev-nbar-wrap">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--cyan);text-align:right;margin-bottom:3px">42%</div>
+              <div class="prev-nbar"><div class="prev-nbar-fill" style="width:42%;background:var(--cyan)"></div></div>
+            </div>
+          </div>
+          <div class="prev-node">
+            <div class="prev-ndot" style="background:var(--cyan);animation-delay:.5s"></div>
+            <div><div class="prev-nname">worker-pc-1</div><div class="prev-ntype">LAPTOP · Ubuntu 20.04</div></div>
+            <div class="prev-nbar-wrap">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--amber);text-align:right;margin-bottom:3px">67%</div>
+              <div class="prev-nbar"><div class="prev-nbar-fill" style="width:67%;background:var(--amber)"></div></div>
+            </div>
+          </div>
+          <div class="prev-node">
+            <div class="prev-ndot" style="background:var(--teal);animation-delay:1s"></div>
+            <div><div class="prev-nname">worker-rpi-1</div><div class="prev-ntype">RPi 4B · Ubuntu 21.04</div></div>
+            <div class="prev-nbar-wrap">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--teal);text-align:right;margin-bottom:3px">28%</div>
+              <div class="prev-nbar"><div class="prev-nbar-fill" style="width:28%;background:var(--teal)"></div></div>
+            </div>
+          </div>
+          <div class="prev-node">
+            <div class="prev-ndot" style="background:var(--teal);animation-delay:1.5s"></div>
+            <div><div class="prev-nname">worker-rpi-2</div><div class="prev-ntype">RPi 4B · Ubuntu 21.04</div></div>
+            <div class="prev-nbar-wrap">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--teal);text-align:right;margin-bottom:3px">35%</div>
+              <div class="prev-nbar"><div class="prev-nbar-fill" style="width:35%;background:var(--teal)"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-caption">
+        <strong>Real-time monitoring</strong> for heterogeneous Kubernetes clusters<br>
+        — 15 metrics updated every 5 seconds —
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  if (Auth.isLoggedIn()) window.location.href = 'dashboard.html';
+  Nav.init('login');
+
+  function showAlert(msg, type) {
+    const el = document.getElementById('auth-alert');
+    el.className = 'auth-alert ' + (type === 'err' ? 'show-err' : 'show-ok');
+    el.innerHTML = `<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style="flex-shrink:0;margin-top:1px"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"/></svg>${msg}`;
+  }
+  function clearAlert() { document.getElementById('auth-alert').className = 'auth-alert'; }
+
+  function switchTab(tab, btn) {
+    document.querySelectorAll('.auth-tab').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('login-panel').classList.toggle('on', tab === 'login');
+    document.getElementById('register-panel').classList.toggle('on', tab === 'register');
+    clearAlert();
+  }
+
+  function doLogin() {
+    const email = document.getElementById('l-email').value.trim();
+    const pass  = document.getElementById('l-pass').value;
+    const btn   = document.getElementById('l-btn');
+    const res   = Auth.login(email, pass);
+    if (!res.ok) return showAlert(res.msg, 'err');
+    btn.classList.add('busy'); btn.textContent = '';
+    showAlert('Access granted — redirecting…', 'ok');
+    setTimeout(() => window.location.href = 'dashboard.html', 900);
+  }
+
+  function doRegister() {
+    const name  = document.getElementById('r-name').value.trim();
+    const email = document.getElementById('r-email').value.trim();
+    const pass  = document.getElementById('r-pass').value;
+    const btn   = document.getElementById('r-btn');
+    const res   = Auth.register(name, email, pass);
+    if (!res.ok) return showAlert(res.msg, 'err');
+    btn.classList.add('busy'); btn.textContent = '';
+    showAlert('Account created — redirecting…', 'ok');
+    setTimeout(() => window.location.href = 'dashboard.html', 900);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    if (document.getElementById('login-panel').classList.contains('on')) doLogin();
+    else doRegister();
+  });
+</script>
+</body>
+</html>

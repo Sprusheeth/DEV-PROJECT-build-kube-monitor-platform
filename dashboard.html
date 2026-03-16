@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kube-Monitor — Dashboard</title>
+<link rel="stylesheet" href="style.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+.dash-wrap { padding: 32px 40px; max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+
+/* Summary stats */
+.summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+.sum-card {
+  padding: 22px 24px; border-radius: 16px;
+  background: var(--bg2); border: 1px solid var(--br);
+  position: relative; overflow: hidden;
+  transition: all .3s var(--ease);
+}
+.sum-card:hover { border-color: var(--br2); transform: translateY(-2px); }
+.sum-card::after { content:''; position:absolute; top:0; left:15%; right:15%; height:1.5px; border-radius:4px; }
+.sum-card.sc1::after { background: linear-gradient(90deg,transparent,var(--cyan),transparent); }
+.sum-card.sc2::after { background: linear-gradient(90deg,transparent,var(--teal),transparent); }
+.sum-card.sc3::after { background: linear-gradient(90deg,transparent,var(--indigo),transparent); }
+.sum-card.sc4::after { background: linear-gradient(90deg,transparent,var(--amber),transparent); }
+.sum-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+}
+.sum-val  { font-size: 30px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.sum-lbl  { font-family: 'IBM Plex Mono',monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text3); }
+.sum-sub  { font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--text2); margin-top: 8px; }
+.trend { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; }
+.trend-up { color: var(--emerald); }
+
+/* Node grid */
+.nodes-section { display: flex; flex-direction: column; gap: 14px; }
+.node-row {
+  background: var(--bg2); border: 1px solid var(--br);
+  border-radius: 14px; padding: 20px 24px;
+  display: grid; grid-template-columns: 220px 1fr 1fr 1fr 1fr 120px;
+  align-items: center; gap: 20px;
+  transition: all .25s var(--ease); cursor: pointer;
+}
+.node-row:hover { border-color: var(--br2); background: var(--bg3); }
+.node-row.active-row { border-color: rgba(56,189,248,.35); background: rgba(56,189,248,.04); }
+
+.node-identity { display: flex; align-items: center; gap: 12px; }
+.node-indicator { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; animation: pulse-dot 2s ease infinite; }
+.node-name-text { font-size: 14px; font-weight: 700; }
+.node-os   { font-family: 'IBM Plex Mono',monospace; font-size: 10px; color: var(--text3); margin-top: 1px; }
+
+.metric-block { }
+.mb-label { font-family: 'IBM Plex Mono',monospace; font-size: 9px; letter-spacing: 2px; color: var(--text4); text-transform: uppercase; margin-bottom: 5px; }
+.mb-value { font-family: 'IBM Plex Mono',monospace; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+.mb-bar { height: 3px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
+.mb-fill { height: 100%; border-radius: 2px; transition: width .8s var(--ease); }
+
+/* Bottom grid: chart + pod table */
+.bottom-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.panel { background: var(--bg2); border: 1px solid var(--br); border-radius: 16px; padding: 24px; }
+.panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--br); }
+.panel-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.panel-sub { font-family: 'IBM Plex Mono',monospace; font-size: 10px; color: var(--text3); }
+.chart-area { height: 230px; position: relative; }
+
+/* Pod table */
+.pod-tbl { width: 100%; border-collapse: collapse; }
+.pod-tbl th { font-family: 'IBM Plex Mono',monospace; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text3); padding: 0 8px 10px; text-align: left; border-bottom: 1px solid var(--br); }
+.pod-tbl td { padding: 9px 8px; font-family: 'IBM Plex Mono',monospace; font-size: 11px; border-bottom: 1px solid rgba(56,189,248,.04); vertical-align: middle; }
+.pod-tbl tr:last-child td { border-bottom: none; }
+.pod-tbl tr:hover td { background: rgba(56,189,248,.025); }
+.tbl-scroll { overflow-y: auto; max-height: 255px; }
+.tbl-scroll::-webkit-scrollbar { width: 3px; }
+.tbl-scroll::-webkit-scrollbar-thumb { background: var(--bg5); border-radius: 2px; }
+
+/* Sec header */
+.sec-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.sec-bar-left { display: flex; align-items: center; gap: 10px; }
+.sec-indicator { width: 4px; height: 20px; border-radius: 2px; }
+.sec-bar-title { font-size: 15px; font-weight: 700; }
+.sec-bar-count { font-family: 'IBM Plex Mono',monospace; font-size: 10px; color: var(--text3); background: var(--bg3); border: 1px solid var(--br); padding: 3px 10px; border-radius: 20px; }
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div id="page-loader"><div class="loader-ring"></div><div class="loader-text">Connecting to Cluster</div></div>
+<div id="navbar" class="navbar"></div>
+
+<div class="page-wrap">
+  <div class="dash-wrap">
+
+    <!-- Summary -->
+    <div class="summary-grid">
+      <div class="sum-card sc1 anim-up-1">
+        <div class="sum-icon" style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>
+        </div>
+        <div class="sum-val text-cyan" id="s-cpu">--</div>
+        <div class="sum-lbl">Total CPU Cores</div>
+        <div class="sum-sub" id="s-cpud">—</div>
+      </div>
+      <div class="sum-card sc2 anim-up-2">
+        <div class="sum-icon" style="background:rgba(45,212,191,.1);border:1px solid rgba(45,212,191,.2)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        </div>
+        <div class="sum-val text-teal" id="s-mem">--</div>
+        <div class="sum-lbl">Total Memory</div>
+        <div class="sum-sub" id="s-memd">—</div>
+      </div>
+      <div class="sum-card sc3 anim-up-3">
+        <div class="sum-icon" style="background:rgba(129,140,248,.1);border:1px solid rgba(129,140,248,.2)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        </div>
+        <div class="sum-val text-indigo" id="s-nodes">4</div>
+        <div class="sum-lbl">Active Nodes</div>
+        <div class="sum-sub">1 Master · 1 PC · 2 RPi</div>
+      </div>
+      <div class="sum-card sc4 anim-up-4">
+        <div class="sum-icon" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+        </div>
+        <div class="sum-val text-amber" id="s-pods">--</div>
+        <div class="sum-lbl">Running Pods</div>
+        <div class="sum-sub">Across all nodes</div>
+      </div>
+    </div>
+
+    <!-- Nodes -->
+    <div class="nodes-section">
+      <div class="sec-bar">
+        <div class="sec-bar-left">
+          <div class="sec-indicator" style="background:var(--cyan)"></div>
+          <div class="sec-bar-title">Node-Level Metrics</div>
+        </div>
+        <span class="sec-bar-count">4 NODES ONLINE</span>
+      </div>
+      <div id="nodes-list">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Charts + Table -->
+    <div class="bottom-section">
+      <div class="panel anim-up-2">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="var(--teal)"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+            CPU Usage History
+          </div>
+          <span class="panel-sub" id="chart-node-lbl">master-node</span>
+        </div>
+        <div class="chart-area"><canvas id="cpuChart"></canvas></div>
+      </div>
+      <div class="panel anim-up-3">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="var(--indigo)"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2z"/></svg>
+            Pod-Level Metrics
+          </div>
+          <span class="panel-sub">REQUEST · LIMIT · USAGE</span>
+        </div>
+        <div class="tbl-scroll">
+          <table class="pod-tbl">
+            <thead><tr>
+              <th>NODE</th><th>REQ CPU</th><th>REQ MEM</th>
+              <th>LIM CPU</th><th>USE CPU</th><th>USE MEM</th>
+            </tr></thead>
+            <tbody id="pod-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /dash-wrap -->
+</div>
+
+<footer id="footer"></footer>
+
+<script src="app.js"></script>
+<script>
+if (!Auth.requireAuth()) { /* redirected */ }
+
+Nav.init('dashboard');
+renderFooter();
+MetricsEngine.init();
+
+let cpuChart = null;
+let selNode  = 'master-node';
+
+function init() {
+  cpuChart = makeLineChart('cpuChart', '#38bdf8', 'CPU (cores)');
+  refresh();
+  setTimeout(() => document.getElementById('page-loader').classList.add('hidden'), 800);
+  setInterval(refresh, 5000);
+}
+
+function refresh() {
+  const data = MetricsEngine.tick();
+  updateSummary(data);
+  renderNodes(data);
+  renderPodTable(data);
+  updateChart();
+}
+
+function updateSummary(data) {
+  const tCPU = data.reduce((a,m)=>a+m.allocCPU,0);
+  const uCPU = data.reduce((a,m)=>a+m.useCPU,0);
+  const tMem = data.reduce((a,m)=>a+m.allocMem,0);
+  const uMem = data.reduce((a,m)=>a+m.useMem,0);
+  const pods = data.reduce((a,m)=>a+m.pods,0);
+  document.getElementById('s-cpu').textContent  = tCPU;
+  document.getElementById('s-cpud').textContent = `${Fmt.cpu(uCPU)} cores used (${Fmt.pct(uCPU,tCPU)}%)`;
+  document.getElementById('s-mem').textContent  = Fmt.bytes(tMem);
+  document.getElementById('s-memd').textContent = `${Fmt.bytes(uMem)} used (${Fmt.pct(uMem,tMem)}%)`;
+  document.getElementById('s-pods').textContent = pods;
+}
+
+function renderNodes(data) {
+  const container = document.getElementById('nodes-list');
+  container.innerHTML = '';
+  data.forEach((m, i) => {
+    const cp = parseFloat(Fmt.pct(m.useCPU, m.allocCPU));
+    const mp = parseFloat(Fmt.pct(m.useMem, m.allocMem));
+    const cc = Fmt.cpuColor(cp), mc = Fmt.memColor(mp);
+    const isSel = m.name === selNode;
+    const typeCol = m.type === 'master' ? 'var(--indigo)' : m.type === 'rpi' ? 'var(--teal)' : 'var(--cyan)';
+    const row = document.createElement('div');
+    row.className = 'node-row anim-up' + (isSel ? ' active-row' : '');
+    row.style.animationDelay = `${i * .07}s`;
+    row.onclick = () => { selNode = m.name; document.getElementById('chart-node-lbl').textContent = m.name; renderNodes(data); updateChart(); };
+    row.innerHTML = `
+      <div class="node-identity">
+        <div class="node-indicator" style="background:${typeCol}"></div>
+        <div>
+          <div class="node-name-text">${m.name}</div>
+          <div class="node-os">${m.os}</div>
+        </div>
+        <span class="badge ${Fmt.nodeTypeBadge(m.type)}" style="margin-left:8px">${Fmt.nodeTypeLabel(m.type)}</span>
+      </div>
+      <div class="metric-block">
+        <div class="mb-label">CPU Usage</div>
+        <div class="mb-value" style="color:${cc}">${Fmt.cpu(m.useCPU)} / ${m.allocCPU}</div>
+        <div class="mb-bar"><div class="mb-fill" style="width:${cp}%;background:${cc}"></div></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);margin-top:3px">${cp}%</div>
+      </div>
+      <div class="metric-block">
+        <div class="mb-label">Memory Usage</div>
+        <div class="mb-value" style="color:${mc}">${Fmt.bytes(m.useMem)}</div>
+        <div class="mb-bar"><div class="mb-fill" style="width:${mp}%;background:${mc}"></div></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);margin-top:3px">${mp}% of ${Fmt.bytes(m.allocMem)}</div>
+      </div>
+      <div class="metric-block">
+        <div class="mb-label">CPU Req / Lim</div>
+        <div class="mb-value">${Fmt.cpu(m.reqCPU)} / ${Fmt.cpu(m.limCPU)}</div>
+      </div>
+      <div class="metric-block">
+        <div class="mb-label">Mem Req / Lim</div>
+        <div class="mb-value">${Fmt.bytes(m.reqMem)} / ${Fmt.bytes(m.limMem)}</div>
+      </div>
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;color:var(--amber)">${m.pods}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:1px">PODS</div>
+        <span class="badge badge-emerald" style="margin-top:4px">${m.status}</span>
+      </div>`;
+    container.appendChild(row);
+  });
+}
+
+function renderPodTable(data) {
+  const tb = document.getElementById('pod-tbody');
+  tb.innerHTML = '';
+  data.forEach(m => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="badge ${Fmt.nodeTypeBadge(m.type)}">${m.name.replace('worker-','')}</span></td>
+      <td style="color:var(--cyan)">${Fmt.cpu(m.reqCPU)}</td>
+      <td style="color:var(--text2)">${Fmt.bytes(m.reqMem)}</td>
+      <td style="color:var(--amber)">${Fmt.cpu(m.limCPU)}</td>
+      <td style="color:var(--teal);font-weight:600">${Fmt.cpu(m.useCPU)}</td>
+      <td style="color:var(--teal);font-weight:600">${Fmt.bytes(m.useMem)}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function updateChart() {
+  updateLineChart(cpuChart, MetricsEngine.getHistory(selNode));
+}
+
+init();
+</script>
+</body>
+</html>

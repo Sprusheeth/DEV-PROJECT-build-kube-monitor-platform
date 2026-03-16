@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kube-Monitor — Metrics</title>
+<link rel="stylesheet" href="style.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+.metrics-wrap { padding: 32px 40px; max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+
+.page-header { display:flex; align-items:center; justify-content:space-between; padding-bottom:24px; border-bottom:1px solid var(--br); }
+.ph-kicker { font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:3px; color:var(--teal); text-transform:uppercase; margin-bottom:6px; }
+.ph-title  { font-size:28px; font-weight:800; letter-spacing:-1px; }
+.ph-sub    { color:var(--text2); font-size:14px; margin-top:4px; }
+
+/* 15-metric grid */
+.m15-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
+.m15-card {
+  background:var(--bg2); border:1px solid var(--br); border-radius:12px;
+  padding:16px; transition:all .2s var(--ease); position:relative; overflow:hidden;
+}
+.m15-card:hover { border-color:var(--br2); transform:translateY(-2px); }
+.m15-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.m15-lbl { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text3); }
+.m15-ico { width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; }
+.m15-val { font-size:19px; font-weight:800; }
+.m15-node { font-family:'IBM Plex Mono',monospace; font-size:9px; color:var(--text3); margin-top:4px; }
+.m15-bar  { margin-top:10px; }
+
+/* Charts section */
+.charts-3col { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.chart-card  { background:var(--bg2); border:1px solid var(--br); border-radius:16px; padding:22px; }
+.cc-header   { margin-bottom:18px; }
+.cc-title    { font-size:14px; font-weight:700; margin-bottom:3px; display:flex; align-items:center; gap:7px; }
+.cc-sub      { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text3); }
+.cc-area     { height:160px; position:relative; }
+
+/* Comparison table */
+.compare-panel { background:var(--bg2); border:1px solid var(--br); border-radius:16px; padding:24px; }
+.compare-tbl   { width:100%; border-collapse:collapse; }
+.compare-tbl th { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--text3); padding:0 14px 12px; text-align:left; border-bottom:1px solid var(--br); white-space:nowrap; }
+.compare-tbl td { padding:12px 14px; font-family:'IBM Plex Mono',monospace; font-size:11px; border-bottom:1px solid rgba(56,189,248,.04); }
+.compare-tbl tr:last-child td { border-bottom:none; }
+.compare-tbl tr:hover td { background:rgba(56,189,248,.03); }
+.metric-heat {
+  display:inline-block; padding:3px 10px; border-radius:4px;
+  font-size:10px; font-weight:600;
+}
+.heat-low  { background:rgba(52,211,153,.12); color:var(--emerald); }
+.heat-mid  { background:rgba(251,191,36,.12); color:var(--amber); }
+.heat-high { background:rgba(251,113,133,.12); color:var(--rose); }
+
+/* Node multi-chart */
+.all-nodes-charts { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.anc-card { background:var(--bg2); border:1px solid var(--br); border-radius:16px; padding:22px; }
+.anc-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.anc-area { height:180px; position:relative; }
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div id="page-loader"><div class="loader-ring"></div><div class="loader-text">Loading Metrics Engine</div></div>
+<div id="navbar" class="navbar"></div>
+
+<div class="page-wrap">
+<div class="metrics-wrap">
+
+  <!-- Header -->
+  <div class="page-header anim-up">
+    <div>
+      <div class="ph-kicker">Kube-Monitor Analytics</div>
+      <div class="ph-title">Cluster Metrics</div>
+      <div class="ph-sub">All 15 resource metrics tracked per the MICST-2022 framework</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="live-badge"><div class="live-pulse"></div>LIVE · 5s</div>
+      <span class="badge badge-cyan" style="padding:7px 14px">15 METRICS</span>
+    </div>
+  </div>
+
+  <!-- 15-Metric Cards -->
+  <div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px">
+        <div style="width:4px;height:18px;border-radius:2px;background:var(--cyan)"></div>
+        Node-Level Metrics
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3)">9 METRICS</span>
+    </div>
+    <div class="m15-grid" id="node-metrics-grid"></div>
+  </div>
+  <div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px">
+        <div style="width:4px;height:18px;border-radius:2px;background:var(--indigo)"></div>
+        Pod-Level Metrics
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3)">6 METRICS</span>
+    </div>
+    <div class="m15-grid" id="pod-metrics-grid"></div>
+  </div>
+
+  <!-- 3 live charts -->
+  <div class="charts-3col anim-up-2">
+    <div class="chart-card">
+      <div class="cc-header">
+        <div class="cc-title"><span style="width:8px;height:8px;border-radius:50%;background:var(--cyan);display:inline-block"></span>CPU Usage — All Nodes</div>
+        <div class="cc-sub">Real-time cores comparison</div>
+      </div>
+      <div class="cc-area"><canvas id="ch-cpu-all"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="cc-header">
+        <div class="cc-title"><span style="width:8px;height:8px;border-radius:50%;background:var(--teal);display:inline-block"></span>Memory Usage — All Nodes</div>
+        <div class="cc-sub">GB in use per node</div>
+      </div>
+      <div class="cc-area"><canvas id="ch-mem-all"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="cc-header">
+        <div class="cc-title"><span style="width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block"></span>Pod Distribution</div>
+        <div class="cc-sub">Running pods per node</div>
+      </div>
+      <div class="cc-area"><canvas id="ch-pods"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Full 15-metric comparison table -->
+  <div class="compare-panel anim-up-3">
+    <div style="margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--br);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:700">Complete 15-Metric Comparison Table</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3)">PER PAPER: MICST-2022</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="compare-tbl">
+        <thead><tr>
+          <th>#</th><th>METRIC NAME</th><th>CATEGORY</th>
+          <th>master-node</th><th>worker-pc-1</th><th>worker-rpi-1</th><th>worker-rpi-2</th>
+          <th>UNIT</th>
+        </tr></thead>
+        <tbody id="compare-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<footer id="footer"></footer>
+<script src="app.js"></script>
+<script>
+if (!Auth.requireAuth()) {}
+Nav.init('metrics');
+renderFooter();
+MetricsEngine.init();
+
+let cpuAllChart = null, memAllChart = null, podChart = null;
+
+const METRICS_DEF = [
+  // Node-level
+  { id:'allocCPU', name:'Allocatable CPU Cores', cat:'Node', unit:'cores', getter: m=>m.allocCPU, fmt: v=>v+' cores' },
+  { id:'allocMem', name:'Allocatable Memory',    cat:'Node', unit:'bytes', getter: m=>m.allocMem, fmt: Fmt.bytes },
+  { id:'limCPU',   name:'Limits CPU Cores',       cat:'Node', unit:'cores', getter: m=>m.limCPU,   fmt: Fmt.cpu },
+  { id:'limMem',   name:'Limits Memory Bytes',    cat:'Node', unit:'bytes', getter: m=>m.limMem,   fmt: Fmt.bytes },
+  { id:'reqCPU',   name:'Requests CPU Cores',     cat:'Node', unit:'cores', getter: m=>m.reqCPU,   fmt: Fmt.cpu },
+  { id:'reqMem',   name:'Requests Memory Bytes',  cat:'Node', unit:'bytes', getter: m=>m.reqMem,   fmt: Fmt.bytes },
+  { id:'useCPU',   name:'Usage CPU Cores',        cat:'Node', unit:'cores', getter: m=>m.useCPU,   fmt: Fmt.cpu },
+  { id:'useMem',   name:'Usage Memory Bytes',     cat:'Node', unit:'bytes', getter: m=>m.useMem,   fmt: Fmt.bytes },
+  { id:'pods',     name:'Pod Count',              cat:'Node', unit:'count', getter: m=>m.pods,     fmt: v=>v },
+  // Pod-level
+  { id:'p_reqCPU', name:'Pod Request CPU Cores',  cat:'Pod',  unit:'cores', getter: m=>m.reqCPU,   fmt: Fmt.cpu },
+  { id:'p_reqMem', name:'Pod Request Memory',     cat:'Pod',  unit:'bytes', getter: m=>m.reqMem,   fmt: Fmt.bytes },
+  { id:'p_limCPU', name:'Pod Limits CPU Cores',   cat:'Pod',  unit:'cores', getter: m=>m.limCPU,   fmt: Fmt.cpu },
+  { id:'p_limMem', name:'Pod Limits Memory',      cat:'Pod',  unit:'bytes', getter: m=>m.limMem,   fmt: Fmt.bytes },
+  { id:'p_useCPU', name:'Pod Usage CPU Cores',    cat:'Pod',  unit:'cores', getter: m=>m.useCPU,   fmt: Fmt.cpu },
+  { id:'p_useMem', name:'Pod Usage Memory',       cat:'Pod',  unit:'bytes', getter: m=>m.useMem,   fmt: Fmt.bytes },
+];
+
+const M_COLORS = { 'allocCPU':'var(--cyan)','allocMem':'var(--teal)','limCPU':'var(--amber)','limMem':'var(--amber)','reqCPU':'var(--indigo)','reqMem':'var(--indigo)','useCPU':'var(--rose)','useMem':'var(--rose)','pods':'var(--emerald)',
+  'p_reqCPU':'var(--cyan)','p_reqMem':'var(--teal)','p_limCPU':'var(--amber)','p_limMem':'var(--amber)','p_useCPU':'var(--rose)','p_useMem':'var(--rose)' };
+
+function heatClass(id, val, allVals) {
+  const max = Math.max(...allVals.map(v => parseFloat(v)||0));
+  const ratio = max ? (parseFloat(val)||0) / max : 0;
+  return ratio > 0.7 ? 'heat-high' : ratio > 0.4 ? 'heat-mid' : 'heat-low';
+}
+
+function renderMetricCards(data) {
+  const nodeMets = METRICS_DEF.filter(m => m.cat === 'Node');
+  const podMets  = METRICS_DEF.filter(m => m.cat === 'Pod');
+  const master   = data.find(d => d.name === 'master-node') || data[0];
+
+  function renderGrid(mets, containerId) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    mets.forEach((md, i) => {
+      const val = md.getter(master);
+      const color = M_COLORS[md.id] || 'var(--cyan)';
+      let pct = 0;
+      if (md.id === 'useCPU' || md.id === 'p_useCPU') pct = parseFloat(Fmt.pct(val, master.allocCPU));
+      else if (md.id === 'useMem' || md.id === 'p_useMem') pct = parseFloat(Fmt.pct(val, master.allocMem));
+      else if (md.id === 'reqCPU' || md.id === 'p_reqCPU' || md.id === 'limCPU' || md.id === 'p_limCPU') pct = parseFloat(Fmt.pct(val, master.allocCPU));
+      else if (md.id === 'reqMem' || md.id === 'p_reqMem' || md.id === 'limMem' || md.id === 'p_limMem') pct = parseFloat(Fmt.pct(val, master.allocMem));
+      else if (md.id === 'pods') pct = (val / 10 * 100);
+      else pct = 100;
+
+      const div = document.createElement('div');
+      div.className = 'm15-card anim-up';
+      div.style.animationDelay = `${i * .04}s`;
+      div.innerHTML = `
+        <div class="m15-top">
+          <span class="m15-lbl">${md.name.replace(' Bytes','').replace(' Cores','')}</span>
+          <div class="m15-ico" style="background:${color.replace('var(--','rgba(').replace(')',', .1)')};border:1px solid ${color.replace('var(--','rgba(').replace(')',', .2)')}">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="${color}" style="-webkit-text-fill-color:initial">
+              <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="m15-val" style="color:${color}">${md.fmt(val)}</div>
+        <div class="m15-node">master-node</div>
+        ${pct > 0 ? `<div class="m15-bar"><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,pct)}%;background:${color}"></div></div></div>` : ''}`;
+      el.appendChild(div);
+    });
+  }
+
+  renderGrid(nodeMets, 'node-metrics-grid');
+  renderGrid(podMets,  'pod-metrics-grid');
+}
+
+function initCharts() {
+  cpuAllChart = new Chart(document.getElementById('ch-cpu-all').getContext('2d'), {
+    type: 'bar',
+    data: { labels: [], datasets: [] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#5a7a96',font:{family:'IBM Plex Mono',size:9}}}},
+      scales:{ x:{ticks:{color:'#5a7a96',font:{family:'IBM Plex Mono',size:9}},grid:{color:'rgba(56,189,248,.04)'}}, y:{ticks:{color:'#5a7a96',font:{family:'IBM Plex Mono',size:9}},grid:{color:'rgba(56,189,248,.04)'}} } }
+  });
+  memAllChart = new Chart(document.getElementById('ch-mem-all').getContext('2d'), {
+    type: 'bar',
+    data: { labels: [], datasets: [] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#5a7a96',font:{family:'IBM Plex Mono',size:9}}}},
+      scales:{ x:{ticks:{color:'#5a7a96',font:{family:'IBM Plex Mono',size:9}},grid:{color:'rgba(56,189,248,.04)'}}, y:{ticks:{color:'#5a7a96',font:{family:'IBM Plex Mono',size:9}},grid:{color:'rgba(56,189,248,.04)'}} } }
+  });
+  podChart = new Chart(document.getElementById('ch-pods').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels: [], datasets: [{ data: [], backgroundColor: ['#818cf8','#38bdf8','#2dd4bf','#2dd4bf88'], borderColor:'rgba(56,189,248,.1)', borderWidth:2 }] },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'right',labels:{color:'#94b8d4',font:{family:'IBM Plex Mono',size:9},boxWidth:10}} } }
+  });
+}
+
+function updateCharts(data) {
+  const labels = data.map(d => d.name.replace('worker-',''));
+  // CPU bar
+  cpuAllChart.data.labels = labels;
+  cpuAllChart.data.datasets = [
+    { label:'Allocatable', data:data.map(d=>d.allocCPU), backgroundColor:'rgba(56,189,248,.15)', borderColor:'#38bdf8', borderWidth:2, borderRadius:4 },
+    { label:'In Use',      data:data.map(d=>parseFloat(d.useCPU.toFixed(2))), backgroundColor:'rgba(56,189,248,.5)', borderColor:'#38bdf8', borderWidth:2, borderRadius:4 },
+  ];
+  cpuAllChart.update('active');
+  // MEM bar
+  memAllChart.data.labels = labels;
+  memAllChart.data.datasets = [
+    { label:'Allocatable GB', data:data.map(d=>parseFloat((d.allocMem/1024**3).toFixed(1))), backgroundColor:'rgba(45,212,191,.15)', borderColor:'#2dd4bf', borderWidth:2, borderRadius:4 },
+    { label:'In Use GB',      data:data.map(d=>parseFloat((d.useMem/1024**3).toFixed(2))),   backgroundColor:'rgba(45,212,191,.5)',  borderColor:'#2dd4bf', borderWidth:2, borderRadius:4 },
+  ];
+  memAllChart.update('active');
+  // Pods doughnut
+  podChart.data.labels = data.map(d => d.name.replace('worker-',''));
+  podChart.data.datasets[0].data = data.map(d => d.pods);
+  podChart.update('active');
+}
+
+function renderCompareTable(data) {
+  const tb = document.getElementById('compare-tbody');
+  tb.innerHTML = '';
+  METRICS_DEF.forEach((md, idx) => {
+    const vals = data.map(d => md.getter(d));
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:var(--text3);font-size:10px">${idx+1}</td>
+      <td style="color:var(--text);font-size:11px;font-family:'Outfit',sans-serif;font-weight:600">${md.name}</td>
+      <td><span class="badge ${md.cat==='Node'?'badge-cyan':'badge-indigo'}">${md.cat}</span></td>
+      ${data.map((d,i)=>{
+        const v = md.getter(d);
+        const formatted = md.fmt(v);
+        const cls = heatClass(md.id, v, vals);
+        return `<td><span class="metric-heat ${cls}">${formatted}</span></td>`;
+      }).join('')}
+      <td style="color:var(--text3)">${md.unit}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function refresh() {
+  const data = MetricsEngine.tick();
+  renderMetricCards(data);
+  updateCharts(data);
+  renderCompareTable(data);
+}
+
+initCharts();
+refresh();
+setTimeout(() => document.getElementById('page-loader').classList.add('hidden'), 700);
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
